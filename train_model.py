@@ -1,82 +1,116 @@
 #!/usr/bin/env python3
 """
-Clothing Recommendation Model Training Script
+Train Clothing Recommendation Model
 
 This script generates synthetic weather data and trains a decision tree classifier
-to predict clothing suggestions based on temperature, humidity, and wind speed.
+to recommend appropriate clothing based on weather conditions.
 """
 
 import pandas as pd
 import numpy as np
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, accuracy_score
+from sklearn.metrics import accuracy_score, classification_report
 import joblib
 import os
 
-def generate_synthetic_data(n_samples=1000):
+def generate_weather_data(n_samples=1000):
     """
-    Generate synthetic weather data with clothing labels.
+    Generate synthetic weather data with realistic ranges.
     
     Args:
         n_samples (int): Number of samples to generate
         
     Returns:
-        pd.DataFrame: DataFrame with weather features and clothing labels
+        tuple: (features, labels)
     """
-    np.random.seed(42)  # For reproducibility
+    np.random.seed(42)  # For reproducible results
     
-    # Generate weather features
-    temperature = np.random.uniform(-5, 35, n_samples)
-    humidity = np.random.uniform(20, 100, n_samples)
-    wind_speed = np.random.uniform(0, 20, n_samples)
+    # Generate weather conditions
+    temperature = np.random.uniform(-10, 40, n_samples)  # Celsius
+    humidity = np.random.uniform(20, 95, n_samples)      # Percentage
+    wind_speed = np.random.uniform(0, 30, n_samples)     # km/h
     
-    # Create DataFrame
-    data = pd.DataFrame({
+    # Create features DataFrame
+    features = pd.DataFrame({
         'temperature': temperature,
         'humidity': humidity,
         'wind_speed': wind_speed
     })
     
-    # Apply rule-based logic to assign clothing labels
-    def assign_clothing(row):
-        temp = row['temperature']
-        wind = row['wind_speed']
+    # Define clothing recommendations based on weather conditions
+    labels = []
+    
+    for i in range(n_samples):
+        temp = features.iloc[i]['temperature']
+        humidity = features.iloc[i]['humidity']
+        wind = features.iloc[i]['wind_speed']
         
-        # Base clothing on temperature
-        if temp >= 20:
-            return 'T-shirt'
-        elif temp >= 10:
-            return 'Light jacket'
+        # ☀️ Hot Weather (Above 30°C / 86°F)
+        if temp > 30:
+            if humidity > 70:
+                labels.append("Light cotton clothes, sandals, sunscreen, hat, stay hydrated")
+            else:
+                labels.append("Lightweight breathable clothes, sunglasses, light colors")
+        
+        # 🌤️ Warm Weather (20–30°C / 68–86°F)
+        elif 20 <= temp <= 30:
+            if wind > 15:
+                labels.append("T-shirt with light jacket, secure footwear, hair tied up")
+            elif humidity > 80:
+                labels.append("Light clothes, deodorant, breathable fabrics")
+            else:
+                labels.append("T-shirts, jeans, sneakers, light cardigan for AC")
+        
+        # 🌧️ Rainy Weather (high humidity + moderate temp)
+        elif humidity > 85 and 10 <= temp <= 25:
+            labels.append("Waterproof jacket, quick-dry pants, rubber boots, umbrella")
+        
+        # ❄️ Cold Weather (Below 10°C / 50°F)
+        elif temp < 10:
+            if wind > 20:
+                labels.append("Heavy winter coat, scarf, gloves, insulated boots, layered clothing")
+            else:
+                labels.append("Warm sweater, winter coat, dark colors, moisturizer")
+        
+        # 🌬️ Windy Weather (high wind + moderate temp)
+        elif wind > 20 and 10 <= temp <= 25:
+            labels.append("Windbreaker jacket, closed shoes, hair secured, protective eyewear")
+        
+        # 🌤️ Mild Weather (10-20°C / 50-68°F)
+        elif 10 <= temp < 20:
+            if humidity > 75:
+                labels.append("Light jacket, quick-dry clothes, comfortable shoes")
+            else:
+                labels.append("Light sweater, jeans, sneakers, light layers")
+        
+        # Default for other conditions
         else:
-            return 'Coat'
+            labels.append("Comfortable casual clothes, weather-appropriate footwear")
     
-    data['clothing'] = data.apply(assign_clothing, axis=1)
-    
-    return data
+    return features, labels
 
-def train_model(data):
+def train_model(features, labels):
     """
-    Train a decision tree classifier on the weather data.
+    Train the decision tree classifier.
     
     Args:
-        data (pd.DataFrame): Training data with features and labels
+        features (DataFrame): Weather features
+        labels (list): Clothing recommendations
         
     Returns:
-        tuple: (trained_model, X_test, y_test, accuracy)
+        DecisionTreeClassifier: Trained model
     """
-    # Prepare features and target
-    X = data[['temperature', 'humidity', 'wind_speed']]
-    y = data['clothing']
-    
     # Split the data
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
+        features, labels, test_size=0.2, random_state=42
     )
     
-    # Train the model
+    # Create and train the model
     model = DecisionTreeClassifier(
-        max_depth=5,  # Limit depth to avoid overfitting
+        max_depth=10,
+        min_samples_split=5,
+        min_samples_leaf=2,
         random_state=42
     )
     
@@ -86,72 +120,121 @@ def train_model(data):
     y_pred = model.predict(X_test)
     accuracy = accuracy_score(y_test, y_pred)
     
-    return model, X_test, y_test, accuracy
+    print(f"✅ Model trained successfully!")
+    print(f"📊 Accuracy: {accuracy:.2%}")
+    print(f"📈 Training samples: {len(X_train)}")
+    print(f"🧪 Test samples: {len(X_test)}")
+    
+    # Print detailed classification report
+    print("\n📋 Classification Report:")
+    print(classification_report(y_test, y_pred))
+    
+    return model
 
-def save_model_and_data(model, data, model_path='model.joblib', data_path='data/synthetic_data.csv'):
+def save_model(model, filename='model.joblib'):
     """
-    Save the trained model and training data.
+    Save the trained model to disk.
     
     Args:
         model: Trained model
-        data (pd.DataFrame): Training data
-        model_path (str): Path to save the model
-        data_path (str): Path to save the data
+        filename (str): Output filename
     """
     # Create data directory if it doesn't exist
-    os.makedirs(os.path.dirname(data_path), exist_ok=True)
+    os.makedirs('data', exist_ok=True)
     
-    # Save the model
+    # Save model
+    model_path = os.path.join('data', filename)
     joblib.dump(model, model_path)
-    print(f"Model saved to {model_path}")
-    
-    # Save the data
-    data.to_csv(data_path, index=False)
-    print(f"Training data saved to {data_path}")
+    print(f"💾 Model saved to: {model_path}")
 
-def main():
-    """Main training pipeline."""
-    print("🚀 Starting Clothing Recommendation Model Training")
+def generate_sample_recommendations():
+    """
+    Generate sample recommendations to demonstrate the model.
+    """
+    print("\n🎯 Sample Recommendations:")
     print("=" * 50)
     
-    # Step 1: Generate synthetic data
-    print("📊 Generating synthetic weather data...")
-    data = generate_synthetic_data(n_samples=1000)
-    print(f"Generated {len(data)} samples")
-    print(f"Data distribution:\n{data['clothing'].value_counts()}")
-    print()
-    
-    # Step 2: Train the model
-    print("🤖 Training Decision Tree Classifier...")
-    model, X_test, y_test, accuracy = train_model(data)
-    print(f"Model accuracy: {accuracy:.3f}")
-    print()
-    
-    # Step 3: Print detailed evaluation
-    print("📈 Model Evaluation:")
-    print("-" * 30)
-    y_pred = model.predict(X_test)
-    print(classification_report(y_test, y_pred))
-    
-    # Step 4: Save model and data
-    print("💾 Saving model and data...")
-    save_model_and_data(model, data)
-    
-    # Step 5: Test predictions
-    print("\n🧪 Testing sample predictions:")
-    print("-" * 30)
-    test_cases = [
-        {'temperature': 25, 'humidity': 60, 'wind_speed': 3},  # Should be T-shirt
-        {'temperature': 15, 'humidity': 50, 'wind_speed': 5},  # Should be Light jacket
-        {'temperature': 5, 'humidity': 80, 'wind_speed': 10},  # Should be Coat
+    sample_conditions = [
+        (35, 60, 5, "☀️ Hot Weather"),
+        (25, 50, 8, "🌤️ Warm Weather"),
+        (15, 90, 10, "🌧️ Rainy Weather"),
+        (5, 70, 25, "❄️ Cold & Windy"),
+        (-5, 80, 5, "❄️ Cold Weather"),
+        (20, 40, 25, "🌬️ Windy Weather"),
+        (12, 75, 8, "🌤️ Mild Weather")
     ]
     
-    for i, case in enumerate(test_cases, 1):
-        prediction = model.predict([list(case.values())])[0]
-        print(f"Test {i}: {case} → {prediction}")
+    for temp, humidity, wind, condition in sample_conditions:
+        print(f"\n{condition} ({temp}°C, {humidity}% humidity, {wind} km/h wind):")
+        
+        if temp > 30:
+            print("   👕 Lightweight, breathable fabrics (cotton/linen)")
+            print("   🎨 Light colors (white, beige, pastels)")
+            print("   👟 Sandals, flip-flops, breathable sneakers")
+            print("   ☀️ Sunscreen (SPF 30+), sunglasses, hat")
+            print("   💧 Stay hydrated!")
+        
+        elif 20 <= temp <= 30:
+            print("   👕 T-shirts, jeans, skirts, polos")
+            print("   🧥 Light cardigans for indoor AC")
+            print("   🎨 Bright or pastel colors")
+            print("   👟 Sneakers, loafers, sandals")
+            print("   ☀️ Light sunscreen if staying out long")
+        
+        elif humidity > 85 and 10 <= temp <= 25:
+            print("   🧥 Waterproof jackets, raincoats")
+            print("   👖 Quick-dry pants or jeans")
+            print("   🎨 Darker colors (hides mud/splashes)")
+            print("   👢 Waterproof shoes, rubber boots")
+            print("   ☔ Carry umbrella, anti-frizz products")
+        
+        elif temp < 10:
+            print("   🧥 Layered clothing: thermals, sweaters, winter coats")
+            print("   🧣 Scarves, gloves, beanies")
+            print("   🎨 Dark shades (navy, black, maroon)")
+            print("   👢 Insulated boots, leather shoes")
+            print("   💄 Moisturizer, lip balm, warm beverages")
+        
+        elif wind > 20 and 10 <= temp <= 25:
+            print("   🧥 Windbreaker jackets")
+            print("   💇 Hair tied up (avoid wind tangle)")
+            print("   👟 Closed shoes or secure footwear")
+            print("   👓 Protective eyewear if dusty")
+            print("   ⚠️ Avoid light scarves or loose hats")
+
+def main():
+    """Main function to train and save the model."""
+    print("🤖 Clothing Recommendation Model Training")
+    print("=" * 50)
     
-    print("\n✅ Training completed successfully!")
-    print("🎯 Model is ready for deployment via Flask API")
+    # Generate training data
+    print("📊 Generating training data...")
+    features, labels = generate_weather_data(n_samples=2000)
+    
+    print(f"📈 Generated {len(features)} training samples")
+    print(f"🎯 Unique recommendations: {len(set(labels))}")
+    
+    # Train the model
+    print("\n🧠 Training the model...")
+    model = train_model(features, labels)
+    
+    # Save the model
+    print("\n💾 Saving the model...")
+    save_model(model)
+    
+    # Generate sample recommendations
+    generate_sample_recommendations()
+    
+    print("\n🎉 Training completed successfully!")
+    print("\n📋 Model Features:")
+    print("   • Temperature (°C)")
+    print("   • Humidity (%)")
+    print("   • Wind Speed (km/h)")
+    
+    print("\n🌐 To use the model:")
+    print("   • API: python app.py")
+    print("   • Web Interface: http://localhost:5001")
+    print("   • Test: python test_api.py")
 
 if __name__ == "__main__":
     main() 

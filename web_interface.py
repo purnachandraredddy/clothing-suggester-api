@@ -9,8 +9,12 @@ and get clothing recommendations through a browser.
 from flask import Flask, render_template_string, request, jsonify
 import requests
 import json
+import os
 
 app = Flask(__name__)
+
+# Get API URL from environment variable or use default
+API_URL = os.getenv('API_URL', 'http://localhost:5001')
 
 # HTML template for the web interface
 HTML_TEMPLATE = """
@@ -208,6 +212,24 @@ HTML_TEMPLATE = """
         .example-btn:hover {
             background: #1565c0;
         }
+        
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e8f5e8;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .status.connected {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+        
+        .status.disconnected {
+            background: #ffebee;
+            color: #c62828;
+        }
     </style>
 </head>
 <body>
@@ -248,6 +270,10 @@ HTML_TEMPLATE = """
                 <button class="example-btn" onclick="fillExample('very-hot')">Very Hot (30°C)</button>
                 <button class="example-btn" onclick="fillExample('very-cold')">Very Cold (-2°C)</button>
             </div>
+            
+            <div class="status" id="apiStatus">
+                <p>🔍 Checking API connection...</p>
+            </div>
         </div>
         
         <div class="result-section" id="resultSection" style="display: none;">
@@ -270,6 +296,30 @@ HTML_TEMPLATE = """
     </div>
 
     <script>
+        // Check API status on page load
+        window.addEventListener('load', function() {
+            checkApiStatus();
+        });
+        
+        async function checkApiStatus() {
+            const statusDiv = document.getElementById('apiStatus');
+            try {
+                const response = await fetch('/api-status');
+                const data = await response.json();
+                
+                if (data.connected) {
+                    statusDiv.className = 'status connected';
+                    statusDiv.innerHTML = '<p>✅ API Connected - Ready to use!</p>';
+                } else {
+                    statusDiv.className = 'status disconnected';
+                    statusDiv.innerHTML = '<p>❌ API Not Connected - Please check if the API server is running</p>';
+                }
+            } catch (error) {
+                statusDiv.className = 'status disconnected';
+                statusDiv.innerHTML = '<p>❌ API Not Connected - Please check if the API server is running</p>';
+            }
+        }
+        
         function fillExample(type) {
             const examples = {
                 'hot': { temperature: 25, humidity: 60, wind_speed: 3 },
@@ -366,6 +416,18 @@ def index():
     """Serve the main web interface."""
     return render_template_string(HTML_TEMPLATE)
 
+@app.route('/api-status')
+def api_status():
+    """Check if the API is connected."""
+    try:
+        response = requests.get(f'{API_URL}/health', timeout=5)
+        if response.status_code == 200:
+            return jsonify({'connected': True, 'status': 'healthy'})
+        else:
+            return jsonify({'connected': False, 'status': 'unhealthy'})
+    except:
+        return jsonify({'connected': False, 'status': 'unreachable'})
+
 @app.route('/predict', methods=['POST'])
 def predict():
     """Proxy the prediction request to the API."""
@@ -374,21 +436,24 @@ def predict():
         
         # Forward the request to the API
         api_response = requests.post(
-            'http://localhost:5001/predict',
+            f'{API_URL}/predict',
             json=data,
-            headers={'Content-Type': 'application/json'}
+            headers={'Content-Type': 'application/json'},
+            timeout=10
         )
         
         return jsonify(api_response.json()), api_response.status_code
         
     except requests.exceptions.ConnectionError:
-        return jsonify({'error': 'API server is not running. Please start the API first.'}), 503
+        return jsonify({'error': f'API server is not running at {API_URL}. Please start the API first.'}), 503
+    except requests.exceptions.Timeout:
+        return jsonify({'error': 'API request timed out. Please try again.'}), 504
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     print("🌐 Starting Web Interface...")
-    print("📡 Web interface will be available at http://localhost:5002")
-    print("🔧 Make sure the API is running on http://localhost:5001")
+    print(f"📡 Web interface will be available at http://localhost:5002")
+    print(f"🔧 API URL: {API_URL}")
     print()
     app.run(host='0.0.0.0', port=5002, debug=False) 

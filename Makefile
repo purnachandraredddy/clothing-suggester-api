@@ -1,104 +1,97 @@
-# Clothing Recommendation System Makefile
+# Clothing Recommendation System - Makefile
+# Use 'make help' to see all available commands
 
-.PHONY: help install train test run clean docker-build docker-run docker-test web
+.PHONY: help install train run-api run-web run-all test clean docker-build docker-run docker-stop docker-logs docker-clean
 
 # Default target
 help:
 	@echo "👕 Clothing Recommendation System"
-	@echo "================================"
+	@echo "=================================="
 	@echo ""
 	@echo "Available commands:"
-	@echo "  install      - Install dependencies"
+	@echo "  install      - Install Python dependencies"
 	@echo "  train        - Train the machine learning model"
-	@echo "  test         - Run tests"
-	@echo "  run          - Start the Flask API server"
-	@echo "  web          - Start the web interface"
-	@echo "  test-api     - Test the API endpoints"
+	@echo "  run-api      - Start the Flask API server"
+	@echo "  run-web      - Start the web interface"
+	@echo "  run-all      - Start both API and web interface"
+	@echo "  test         - Run all tests"
 	@echo "  clean        - Clean up generated files"
-	@echo "  docker-build - Build Docker image"
-	@echo "  docker-run   - Run with Docker Compose"
-	@echo "  docker-test  - Test with Docker"
-	@echo "  format       - Format code with black"
-	@echo "  lint         - Lint code with flake8"
-	@echo "  all          - Install, train, test, and run"
+	@echo ""
+	@echo "Docker commands:"
+	@echo "  docker-build - Build Docker images"
+	@echo "  docker-run   - Run containers using docker-compose"
+	@echo "  docker-stop  - Stop and remove containers"
+	@echo "  docker-logs  - View container logs"
+	@echo "  docker-clean - Clean up Docker resources"
+	@echo ""
 
-# Install dependencies
+# Development commands
 install:
-	@echo "📦 Installing dependencies..."
+	@echo "📦 Installing Python dependencies..."
 	pip install -r requirements.txt
 
-# Train the model
 train:
-	@echo "🤖 Training the model..."
+	@echo "🤖 Training the machine learning model..."
 	python train_model.py
 
-# Run tests
+run-api:
+	@echo "🚀 Starting API server..."
+	python app.py
+
+run-web:
+	@echo "🌐 Starting web interface..."
+	python web_interface.py
+
+run-all:
+	@echo "🚀 Starting both API and web interface..."
+	@echo "Starting API in background..."
+	@python app.py &
+	@sleep 3
+	@echo "Starting web interface..."
+	@python web_interface.py
+
 test:
 	@echo "🧪 Running tests..."
 	python -m pytest tests/ -v
-
-# Start the API server
-run:
-	@echo "🚀 Starting Flask API server..."
-	python app.py
-
-# Start the web interface
-web:
-	@echo "🌐 Starting Web Interface..."
-	python web_interface.py
-
-# Test the API
-test-api:
-	@echo "🔍 Testing API endpoints..."
 	python test_api.py
+	python test_web_interface.py
 
-# Clean up generated files
 clean:
 	@echo "🧹 Cleaning up..."
-	rm -f model.joblib
-	rm -rf data/
-	rm -rf logs/
 	rm -rf __pycache__/
-	rm -rf tests/__pycache__/
-	find . -type f -name "*.pyc" -delete
-	find . -type d -name "__pycache__" -delete
+	rm -rf *.pyc
+	rm -rf .pytest_cache/
+	rm -rf data/*.pkl
+	rm -rf data/*.joblib
+	rm -rf logs/*.log
 
-# Build Docker image
+# Docker commands
 docker-build:
-	@echo "🐳 Building Docker image..."
-	docker build -f docker/Dockerfile -t clothing-recommender .
+	@echo "🐳 Building Docker images..."
+	docker-compose -f docker/docker-compose.yml build
 
-# Run with Docker Compose
 docker-run:
-	@echo "🐳 Running with Docker Compose..."
-	docker-compose -f docker/docker-compose.yml up --build
+	@echo "🐳 Running Docker containers..."
+	@echo "This will start both API and web interface in containers"
+	@echo "API will be available at http://localhost:5001"
+	@echo "Web interface will be available at http://localhost:5002"
+	docker-compose -f docker/docker-compose.yml up -d
 
-# Test with Docker
-docker-test:
-	@echo "🐳 Testing with Docker..."
-	docker-compose -f docker/docker-compose.yml up test-client
+docker-stop:
+	@echo "🛑 Stopping Docker containers..."
+	docker-compose -f docker/docker-compose.yml down
 
-# Format code
-format:
-	@echo "🎨 Formatting code..."
-	black . --line-length=88
+docker-logs:
+	@echo "📋 Viewing Docker container logs..."
+	docker-compose -f docker/docker-compose.yml logs -f
 
-# Lint code
-lint:
-	@echo "🔍 Linting code..."
-	flake8 . --max-line-length=88 --ignore=E203,W503
+docker-clean:
+	@echo "🧹 Cleaning up Docker resources..."
+	docker-compose -f docker/docker-compose.yml down -v
+	docker system prune -f
 
-# Complete setup and run
-all: install train test run
-
-# Development setup
-dev-setup: install train
-	@echo "✅ Development environment ready!"
-	@echo "Run 'make run' to start the API server"
-	@echo "Run 'make web' to start the web interface"
-	@echo "Run 'make test-api' to test the API"
-
-# Production setup
-prod-setup: install train
-	@echo "✅ Production environment ready!"
-	@echo "Run 'make docker-run' to start with Docker" 
+# Quick start with Docker
+docker-quick:
+	@echo "🚀 Quick start with Docker..."
+	@echo "Building and running containers..."
+	./run_docker.sh 

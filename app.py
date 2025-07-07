@@ -79,25 +79,30 @@ def validate_input(data):
 
 @app.route('/')
 def home():
-    """Home endpoint with API information."""
-    return jsonify({
-        'message': '👕 Clothing Recommendation API',
-        'version': '1.0.0',
-        'endpoints': {
-            'GET /': 'API information',
-            'POST /predict': 'Get clothing recommendation',
-            'GET /health': 'Health check'
-        },
-        'usage': {
-            'method': 'POST',
-            'endpoint': '/predict',
-            'body': {
-                'temperature': 'float (Celsius)',
-                'humidity': 'float (percentage)',
-                'wind_speed': 'float (km/h)'
+    """Serve the web interface HTML."""
+    try:
+        with open('static/index.html', 'r', encoding='utf-8') as f:
+            return f.read(), 200, {'Content-Type': 'text/html'}
+    except FileNotFoundError:
+        # Fallback to API info if HTML file not found
+        return jsonify({
+            'message': '👕 Clothing Recommendation API',
+            'version': '1.0.0',
+            'endpoints': {
+                'GET /': 'API information',
+                'POST /predict': 'Get clothing recommendation',
+                'GET /health': 'Health check'
+            },
+            'usage': {
+                'method': 'POST',
+                'endpoint': '/predict',
+                'body': {
+                    'temperature': 'float (Celsius)',
+                    'humidity': 'float (percentage)',
+                    'wind_speed': 'float (km/h)'
+                }
             }
-        }
-    })
+        })
 
 @app.route('/health')
 def health_check():
